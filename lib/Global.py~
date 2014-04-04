@@ -1,0 +1,9 @@
+import re
+
+reFnameMatch = re.compile('.*/[0-9]+_[a-zA-z]+$')
+reFnameSplit = re.compile('_[a-zA-z]+$')
+reWordSplit = re.compile('[\W\s]+')
+reFirstChar = re.compile('[a-z0-9]')
+
+wordSets = set()
+urlId = 0

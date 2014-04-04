@@ -1,0 +1,2 @@
+g++-4.8 -std=c++11  search.cpp lib/Index.cpp lib/Common.cpp lib/Posting.cpp -o search
+./search
