@@ -2,6 +2,10 @@
 
 using namespace std;
 
+
+
+
+
 unordered_map<string, DictVal*> Index::dict;
 unordered_map<string, UrlVal*> Index::urlMap;
 int Index::blockSize = sizeof(int)+sizeof(short)+sizeof(char) + ((sizeof(short)*2)+sizeof(char))*3;
@@ -9,6 +13,10 @@ int Index::uncomprBlockSize = (sizeof(int)+sizeof(short)+sizeof(char))*4;
 int Index::firstHitSize = sizeof(int)+sizeof(short)+sizeof(char);
 int Index::subHitSize = (sizeof(short)*2)+sizeof(char);
 int Index::distBetweenFirst = sizeof(short)+sizeof(char)+((sizeof(short)*2)+sizeof(char))*3;
+
+
+
+
 /**
  * DictVal constructor
  */
@@ -33,13 +41,19 @@ IndexVal::IndexVal(unsigned int urlId){
 	this->total = 0;
 	this->hits = vector<HitVal>();
 }
-
-
+/**
+ * BlockVal constructor
+ */
+BlockVal::BlockVal(){
+	this->urlId = 0;
+	this->start = 0;
+	this->size = 0;
+}
 /**
  * HitVal constructor
  */
-HitVal::HitVal(unsigned int pos, char tagType){
-	this->urlId = pos;
+HitVal::HitVal(unsigned short pos, char tagType){
+	this->pos = pos;
 	this->tagType = tagType;
 }
 /**
@@ -152,7 +166,7 @@ int Index::postIndexToBinFile(vector<Posting> postings, short fileIndex){
 int Index::postIndexToComprBinFile(vector<Posting> postings, short fileIndex){
 	ofstream f;	
 	string filename;
-	filename = "dumps/index/bin/" + to_string(fileIndex);
+	filename = "dumps/index/comprbin/" + to_string(fileIndex);
 	f.open(filename.c_str(),  ios::out|ios::binary|ios::app);
 	
 	unsigned int start = 0, end = 0;
@@ -194,70 +208,121 @@ int Index::postIndexToComprBinFile(vector<Posting> postings, short fileIndex){
 
 
 
-void Index::buildIndexDs(vector<Posting> postings, map<int,IndexVal*>& outIndexMap){
+void Index::buildIndexDs(vector<Posting> postings, map<int,IndexVal>& outIndexMap){
 	unsigned int currUrlId = 0;	
-	IndexVal* index;
+	IndexVal index(0);
 	for(int i=0; i<postings.size(); ++i){
-		if(currUrlId != postings[i].getUrlId()){
-			outUIds.push_back(postings[i].getUrlId());
-			index = new IndexVal(postings[i].getUrlId());
-			outIndexMap.emplace(postings[i].getUrlId(), index);
+		if(i==0){
+			index = IndexVal(postings[i].getUrlId());
 		}
+		else if(i!=0 && currUrlId != postings[i].getUrlId()){
+			outIndexMap.emplace(currUrlId, index);
+			index = IndexVal(postings[i].getUrlId());
+		}
+		
+		index.hits.push_back(HitVal(postings[i].getPos(),postings[i].getTagType()));
+		++index.total;
 		currUrlId = postings[i].getUrlId();
-		index->hits.push_back(HitVal(postings[i].getPos(),postings[i].getTagType()));
-		++index->total;
+		
+		if(i == postings.size()-1){
+			outIndexMap.emplace(currUrlId, index);
+		}
+	}
+}
+
+void Index::writeToFile(ofstream& f, vector<unsigned char> v){
+	if(f.is_open()){
+		for(int i=0; i<v.size(); ++i){
+			f.write((char*)&v[i], Constants::CHAR_SIZE);
+		}
+	}
+}
+
+void Index::processIndexVal(ofstream& f, IndexVal& index, unsigned int& size){
+	vector<unsigned char> comprUrlId;
+	vector<unsigned char> comprTotal;
+	vector<unsigned char> comprHitPos;
+	vector<unsigned char> comprHitTagType;
+	
+	encode(index.urlId,comprUrlId);
+	size += comprUrlId.size()*Constants::CHAR_SIZE;
+	writeToFile(f,comprUrlId);
+	
+	encode(index.total,comprTotal);
+	size += comprTotal.size()*Constants::CHAR_SIZE;
+	writeToFile(f,comprTotal);
+	for(int i=0; i<index.hits.size(); ++i){
+		comprHitPos = vector<unsigned char>();
+		encode(index.hits[i].pos,comprHitPos);
+		size += comprHitPos.size()*Constants::CHAR_SIZE;
+		writeToFile(f,comprHitPos);
+		
+		comprHitTagType = vector<unsigned char>();
+		encode(index.hits[i].tagType,comprHitTagType);
+		size += comprHitTagType.size()*Constants::CHAR_SIZE;
+		writeToFile(f,comprHitTagType);
 	}
 }
 
 
+void Index::processBlockVal(ofstream& f, BlockVal& block){
+	vector<unsigned char> comprUrlId;
+	vector<unsigned char> comprStart;
+	vector<unsigned char> comprSize;
+	
+	encode(block.urlId,comprUrlId);
+	writeToFile(f,comprUrlId);
+	
+	encode(block.start,comprStart);
+	writeToFile(f,comprStart);	
 
+	encode(block.size,comprSize);
+	writeToFile(f,comprSize);
+	
+}
 
-
-
-
-
-
-/**
- * This function posts the compressed inverted indexes to binary file
- */
-int Index::(vector<Posting> postings, short fileIndex){
+unsigned int Index::postIndex(vector<Posting> postings, unsigned short fileIndex){
+	map<int,IndexVal> indexMap;
+	vector<BlockVal> bVals;
+	int totalSize;
+	unsigned int indStart = 0;
+	unsigned int indEnd = 0;
+	int i = 0;
+	BlockVal bVal;
 	ofstream f;	
 	string filename;
-	filename = "dumps/index/bin/" + to_string(fileIndex);
+
+	buildIndexDs(postings, indexMap);
+	
+	totalSize = indexMap.size();
+	
+
+	//cout<<totalSize<<endl;
+
+	filename = "dumps/index/comprbin/" + to_string(fileIndex);
 	f.open(filename.c_str(),  ios::out|ios::binary|ios::app);
 	
-	unsigned int start = 0, end = 0;
-	if(f.is_open()){
-		start = (unsigned int) f.tellp();
-		int prevUrlId;
-		for(int i = 0; i<postings.size(); ++i){
-			
-			if(i%4 == 0){
-				unsigned int urlId = postings[i].getUrlId();
-				unsigned short pos = postings[i].getPos();
-				char tagType = postings[i].getTagType();
-				prevUrlId = urlId;
-				f.write((char*)&urlId, sizeof(int));
-				f.write((char*)&pos, sizeof(short));
-				f.write((char*)&tagType, sizeof(char));
-			}
-			else{
-				unsigned int urlId = postings[i].getUrlId();
-				unsigned short diff = (unsigned short)(urlId - prevUrlId);
-				prevUrlId = urlId;
-				unsigned short pos = postings[i].getPos();
-				char tagType = postings[i].getTagType();
-				f.write((char*)&diff, sizeof(short));
-				f.write((char*)&pos, sizeof(short));
-				f.write((char*)&tagType, sizeof(char));
-			}
+	for(map<int,IndexVal>::iterator iter = indexMap.begin(); iter!=indexMap.end(); ++iter){
+		if(i%Constants::URLS_IN_BLOCK == 0){
+			bVal = BlockVal();
+			bVal.urlId = iter->first;
+			bVal.start = (unsigned int) f.tellp();
 		}
-		end = (unsigned int) f.tellp();
-		f.close();
-		postToDict(postings[0].getWord(), (unsigned int)postings.size(), fileIndex, start, end);
-		return end;
+		processIndexVal(f, iter->second, bVal.size);
+		
+		if((i%Constants::URLS_IN_BLOCK == Constants::URLS_IN_BLOCK-1) || i == totalSize-1){
+			bVals.push_back(bVal);	
+		}
+		++i;
 	}
-	return 0;
+	indStart = (unsigned int) f.tellp();
+	for(int i=0; i<bVals.size(); ++i){
+		processBlockVal(f,bVals[i]);
+	}
+	indEnd = (unsigned int) f.tellp();
+	postToDict(postings[0].getWord(), (unsigned int)postings.size(), fileIndex, indStart, indEnd);
+	f.close();
+	return indEnd;
 }
 
 
