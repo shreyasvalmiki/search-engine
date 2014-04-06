@@ -73,6 +73,8 @@ void indexSortedFileToComprBin(string filename){
 }
 
 
+
+
 /**
  * Creates the inverted index in multiple text files based on the file size limit specified
  */
@@ -104,6 +106,41 @@ void indexSortedFileToText(string filename){
 	inf.close();
 }
 
+
+/**
+ * Creates the inverted index in multiple compressed binary files based on the file size limit specified
+ */
+void indexPostings(string filename){
+	ifstream inf;
+	inf.open(filename.c_str());
+	string line;
+	string currWord = "";
+	vector<Posting> postings;
+	if(inf.is_open()){
+		while(getline(inf,line)){
+			if(line.size()>0){
+				Posting post(line);
+				if(currWord.size() > 0 && currWord.compare(post.getWord()) != 0){
+					//cout<<post.getWord()<<endl;			
+					unsigned int len = Index::postIndex(postings, fileIndex);
+					if(len >= sizeLimit){
+						fileIndex++;
+					}
+					postings.clear();
+				}
+				postings.push_back(post);
+				currWord = post.getWord();
+			}
+			
+		}	
+	}
+	inf.close();
+}
+
+
+
+
+
 /**
  * First argument to the program sets the size of each index file
  * 2nd argument (b/t) allows to save index files in binary or in text format
@@ -122,7 +159,8 @@ int main(int argc, char* argv[]){
 	while (cin >> lineInput) {
 		cout << "Processing: " << lineInput << endl;
 		if(isBin){
-			indexSortedFileToComprBin("dumps/sorted/"+lineInput);
+			//indexSortedFileToComprBin("dumps/sorted/"+lineInput);
+			indexPostings("dumps/sorted/"+lineInput);
 		}
   		else{
   			indexSortedFileToText("dumps/sorted/"+lineInput);
