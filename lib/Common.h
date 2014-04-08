@@ -1,5 +1,6 @@
 #include<vector>
 #include<string>
+#include<cstring>
 #include<sstream>
 
 #ifndef COMMON_H_
@@ -15,4 +16,5 @@ std::vector<std::string> &split(const std::string &s, char delim, std::vector<st
 std::vector<std::string> split(const std::string &s, char delim);
 void encode(unsigned int value, vector<unsigned char>& output);
 void decode(unsigned char* input, unsigned int size, vector<unsigned int>& out);
+string to_lower(string str);
 #endif

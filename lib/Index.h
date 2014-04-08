@@ -28,6 +28,7 @@ class UrlVal{
 public:
 	string url;
 	unsigned int total;
+	UrlVal();
 	UrlVal(string, unsigned int);
 };
 

@@ -29,6 +29,7 @@ DictVal::DictVal(unsigned int total, string fileIndex, unsigned int start, unsig
 /**
  * UrlVal constructor
  */
+UrlVal::UrlVal(){}
 UrlVal::UrlVal(string url, unsigned int total){
 	this->total = total;
 	this->url = url;
@@ -284,7 +285,7 @@ void Index::processBlockVal(ofstream& f, BlockVal& block){
 unsigned int Index::postIndex(vector<Posting> postings, unsigned short fileIndex){
 	map<int,IndexVal> indexMap;
 	vector<BlockVal> bVals;
-	int totalSize;
+	unsigned int totalSize;
 	unsigned int indStart = 0;
 	unsigned int indEnd = 0;
 	int i = 0;
@@ -296,8 +297,6 @@ unsigned int Index::postIndex(vector<Posting> postings, unsigned short fileIndex
 	
 	totalSize = indexMap.size();
 	
-
-	//cout<<totalSize<<endl;
 
 	filename = "dumps/index/comprbin/" + to_string(fileIndex);
 	f.open(filename.c_str(),  ios::out|ios::binary|ios::app);
@@ -320,50 +319,9 @@ unsigned int Index::postIndex(vector<Posting> postings, unsigned short fileIndex
 		processBlockVal(f,bVals[i]);
 	}
 	indEnd = (unsigned int) f.tellp();
-	postToDict(postings[0].getWord(), (unsigned int)postings.size(), fileIndex, indStart, indEnd);
+	postToDict(postings[0].getWord(), totalSize, fileIndex, indStart, indEnd);
 	f.close();
 	return indEnd;
 }
 
 
-
-/**
- * This function gets the inverted indexes from the particular file using the value obtained from the dictionary.
- * It returns the indexes for each word in the form of a vector of indexes.
- * This only works on the binary file.
- */
-//vector<IndexVal> Index::getIndex(string word){
-//	ifstream inf;
-//	vector<IndexVal> indexVals;
-//	if(dict[word] != NULL){
-//		DictVal* dVal =  dict[word];
-//		inf.open("dumps/index/bin/"+to_string(dVal->fileIndex),ios::binary | ios::out);
-//		unsigned int size = dVal->end - dVal->start;
-//		unsigned int totalBlocks = (int) ceil((float)size/(float)bufferSize);
-//		unsigned int totalHits = size/hitSize;
-//		char[bufferSize] buffer;
-//		unsigned int hitCount = 0;
-//		for(int i = 0; i<totalBlocks; ++i){
-//			inf.read(buffer, bufferSize);
-//			char[hitSize] hit;
-//			if(hitCount < totalHits){
-//				for(int j = 0; j < bufferSize/hitSize; ++j){
-//					if(hitCount < totalHits){
-//						unsigned int urlId;
-//						unsigned short pos;
-//						char type;
-//						memcpy(&urlId, buffer + (j*hitSize), sizeof(int));
-//						memcpy(&pos, buffer + (j*hitSize)+sizeof(int), sizeof(short));
-//						memcpy(&type, buffer + (j*hitSize)+sizeof(int)+sizeof(short), sizeof(char));
-//						++hitCount;
-//						IndexVal val(urlId,pos,type);
-//						indexVals.push_back(val);
-//					}
-//				}
-//			}
-//			
-//		}
-//		
-//	}
-//	return indexVals;
-//}
