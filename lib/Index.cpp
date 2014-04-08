@@ -208,7 +208,9 @@ int Index::postIndexToComprBinFile(vector<Posting> postings, short fileIndex){
 
 
 
-
+/**
+ * Builds the data structure from the list of hits of the same word
+ */
 void Index::buildIndexDs(vector<Posting> postings, map<int,IndexVal>& outIndexMap){
 	unsigned int currUrlId = 0;	
 	IndexVal index(0);
@@ -238,7 +240,9 @@ void Index::writeToFile(ofstream& f, vector<unsigned char> v){
 		}
 	}
 }
-
+/**
+ * Posts index value to the file. Each value is compressed.
+ */
 void Index::processIndexVal(ofstream& f, IndexVal& index, unsigned int& size){
 	vector<unsigned char> comprUrlId;
 	vector<unsigned char> comprTotal;
@@ -265,7 +269,9 @@ void Index::processIndexVal(ofstream& f, IndexVal& index, unsigned int& size){
 	}
 }
 
-
+/**
+ * Posts each block value, compressed, in the auxiliary list for a word
+ */
 void Index::processBlockVal(ofstream& f, BlockVal& block){
 	vector<unsigned char> comprUrlId;
 	vector<unsigned char> comprStart;
@@ -281,7 +287,9 @@ void Index::processBlockVal(ofstream& f, BlockVal& block){
 	writeToFile(f,comprSize);
 	
 }
-
+/**
+ * Posts compressed index into file
+ */
 unsigned int Index::postIndex(vector<Posting> postings, unsigned short fileIndex){
 	map<int,IndexVal> indexMap;
 	vector<BlockVal> bVals;
@@ -300,7 +308,9 @@ unsigned int Index::postIndex(vector<Posting> postings, unsigned short fileIndex
 
 	filename = "dumps/index/comprbin/" + to_string(fileIndex);
 	f.open(filename.c_str(),  ios::out|ios::binary|ios::app);
-	
+	/*
+	 * Posts the hits to the binary file 
+	 */
 	for(map<int,IndexVal>::iterator iter = indexMap.begin(); iter!=indexMap.end(); ++iter){
 		if(i%Constants::URLS_IN_BLOCK == 0){
 			bVal = BlockVal();
@@ -308,12 +318,14 @@ unsigned int Index::postIndex(vector<Posting> postings, unsigned short fileIndex
 			bVal.start = (unsigned int) f.tellp();
 		}
 		processIndexVal(f, iter->second, bVal.size);
-		
 		if((i%Constants::URLS_IN_BLOCK == Constants::URLS_IN_BLOCK-1) || i == totalSize-1){
 			bVals.push_back(bVal);	
 		}
 		++i;
 	}
+	/*
+	 * Posts auxiliary list
+	 */
 	indStart = (unsigned int) f.tellp();
 	for(int i=0; i<bVals.size(); ++i){
 		processBlockVal(f,bVals[i]);
@@ -323,5 +335,3 @@ unsigned int Index::postIndex(vector<Posting> postings, unsigned short fileIndex
 	f.close();
 	return indEnd;
 }
-
-

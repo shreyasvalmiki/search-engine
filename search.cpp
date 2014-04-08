@@ -7,7 +7,9 @@
 #include <cstring>
 #include <stdio.h>
 #include <unordered_map>
-
+/**
+ * Clears all temporary data structures
+ */
 void clearAll(){
 	Query::uncomprCache = unordered_map<string, vector<unsigned int>>();
 	Query::bmMap = unordered_map<unsigned int, BMDocument>();

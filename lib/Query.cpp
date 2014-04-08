@@ -19,6 +19,8 @@ double Query::k1 = 1.2;
 double Query::b = 0.75;
 double Query::dAvg = 0;
 double Query::N = 0;
+
+
 BMDocument::BMDocument(){}
 BMDocument::BMDocument(unsigned int urlId, double bm){
 	unordered_map<unsigned int,UrlVal>::const_iterator pair = Query::urlMap.find(urlId);
@@ -30,7 +32,9 @@ BMDocument::BMDocument(unsigned int urlId, double bm){
 	}
 	this->bm = bm;
 }
-
+/**
+ * Initializes list
+ */
 void Query::init(){
 	buildDictFromFile();
 	buildUrlMapFromFile();
@@ -38,7 +42,9 @@ void Query::init(){
 }
 
 
-
+/**
+ * Sets the document constants for BM25 calculation
+ */
 void Query::setDocConsts(){
 	unsigned long long sum = 0;
 	
@@ -50,7 +56,9 @@ void Query::setDocConsts(){
 	cout<<dAvg<<endl;
 	cout<<N<<endl;
 }
-
+/**
+ * Gets any compressed chunk of data and uncompresses it
+ */
 void Query::getUncompressed(string fileIndex, unsigned int start, unsigned int size, vector<unsigned int>& list){	
 	unsigned char* buff;
 	buff = (unsigned char*) malloc (Constants::CHAR_SIZE*size);
@@ -65,15 +73,13 @@ void Query::getUncompressed(string fileIndex, unsigned int start, unsigned int s
 		decode(buff, size, list);
 	}
 }
-
+/**
+ * Gets the auxiliary list and uncompresses it
+ */
 vector<unsigned int> Query::getIndexAuxList(DictVal dictVal){
 	vector<unsigned int> list;
 	unsigned int size = dictVal.end - dictVal.start;
 	getUncompressed(dictVal.fileIndex,dictVal.start,size,list);
-//	for(int i=0; i<list.size(); ++i){
-//		cout<<list[i]<<",";
-//	}
-//	cout<<endl;
 	return list;
 }
 
@@ -112,40 +118,34 @@ void Query::buildUrlMapFromFile(){
 	}
 	inf.close();
 }
-
+/**
+ * Gets the compressed chunks and uncompresses it
+ */
 vector<unsigned int> Query::getChunk(string word, unsigned int chunkId, string fileIndex, unsigned int start, unsigned int size){
-//	unordered_map<string, unordered_map<unsigned int, vector<unsigned int>>>::const_iterator pair = Query::cache.find(word);
-
-
 	unordered_map<string,vector<unsigned int>>::const_iterator pair = Query::uncomprCache.find(word+to_string(chunkId));
 
 	if(pair != Query::uncomprCache.end()){
-//		unordered_map<unsigned int, vector<unsigned int>>::const_iterator secPair = pair->second.find(chunkId);
-//		if(secPair != pair->second.end()){
-//			return secPair->second;
-//		}
-//		else{
-//			vector<unsigned int> v;
-//			getUncompressed(fileIndex,start,size,v);
-//			pair->second.emplace(chunkId,v);
-//			return v;
-//		}
 		return pair->second;
 	}
 	else{
 		vector<unsigned int> v;
 		getUncompressed(fileIndex,start,size,v);
-//		unordered_map<unsigned int, vector<unsigned int>> vMap;
-//		vMap.emplace(chunkId,v);
 		Query::uncomprCache.emplace(word+to_string(chunkId), v);
 		return v;
 	}
 }
+
+/**
+ * Calculates BM25 score
+ */
 double Query::bm25(double d, double ft, double fdt){
 	double K = (double)(k1*((1-Query::b)+Query::b*(d/Query::dAvg)));
 	return (double)(log((double)((Query::N-ft+0.5)/(ft+0.5))) * (((k1+1)*fdt)/(K+fdt)));
 }
 
+/**
+ * Calculates BM25 score for the document IDs that match. Gets only the chunk that is required
+ */
 void Query::getNextDoc(string word, DictVal dictVal, vector<unsigned int>& auxList, int& startIndex, unsigned int urlId, BMDocument& bmDoc){
 	
 	for(int i=startIndex; i<auxList.size(); i+=3){
@@ -155,56 +155,34 @@ void Query::getNextDoc(string word, DictVal dictVal, vector<unsigned int>& auxLi
 			unsigned int j = 0;
 			
 			while(j<v.size()){
-//				BMDocument bmTemp(v[j],0);
-//				double bm = bm25((double)bmTemp.url.total, (double)dictVal.total, (double)v[j+1]);
 				if(v[j] == urlId){
 					double bm = bm25((double)bmDoc.url.total, (double)dictVal.total, (double)v[j+1]);
 					bmDoc.bm += bm;
-					//cout<<"test: "<<bmDoc.url.url << "\t\t" << bm <<endl; 
-					break;
-//					unordered_map<unsigned int, BMDocument>::const_iterator pair = bmMap.find(v[j]);
-//					if(pair != bmMap.end()){
-//						double bm = bm25((double)pair->second.total, (double)dictVals[prime].total, (double)v[j+1]);
-//						pair->second.bm += bm;
-//					}	
+					break;	
 				}
-				
-				
-//				if(pair != bmMap.end()){
-//					pair->second.bm += bm;
-//				}
-//				else{
-//					bmTemp.bm += bm;
-//					bmMap.emplace(v[j],bmTemp);
-//				}
 				j = v[j+1]*2 + 1;
 			}
 			break;
 		}
 	}
 }
-
+/**
+ * Reads each document ID in the index for the word, calculates the BM25 score for 
+ * the document ID and ignores doc ID if it is already there in the map and compares it to other document lists.
+ * This function reads all the chunks
+ */
 void Query::processPrime(vector<vector<unsigned int>>& auxLists, vector<string>& dictWords, vector<DictVal>& dictVals, int prime){
 	vector<int> startMap;
 	for(int i=0; i<dictWords.size(); ++i){
 		startMap.push_back(0);
 	}
-	for(int i=0; i<auxLists[prime].size(); i+=3){
-		
+	for(int i=0; i<auxLists[prime].size(); i+=3){		
 		vector<unsigned int> v = getChunk(dictWords[prime], auxLists[prime][i], dictVals[prime].fileIndex, auxLists[prime][i+1], auxLists[prime][i+2]);
 		unsigned int j = 0;
-		
-		//cout<<"Chunk Vector: "<<v.size()<<endl;
 
 		while(j<v.size()){
 			unordered_map<unsigned int, BMDocument>::const_iterator pair = Query::bmMap.find(v[j]);
 			if(pair == bmMap.end()){
-//				if(prime == 0){
-//					double bm = bm25((double)pair->second.total, (double)dictVals[prime].total, (double)v[j+1]);
-//					pair->second.bm += bm;
-//				}
-//			}
-//			else{
 				BMDocument bmTemp(v[j],0);
 				double bm = bm25((double)bmTemp.url.total, (double)dictVals[prime].total, (double)v[j+1]);
 				bmTemp.bm = bm;
@@ -217,7 +195,9 @@ void Query::processPrime(vector<vector<unsigned int>>& auxLists, vector<string>&
 		}	
 	}
 }
-
+/**
+ * Breaks the words into tokens and processes the chunks one by one
+ */
 void Query::processQuery(string query){
 	vector<string> words = split(to_lower(query), ' ');
 	vector<DictVal> dictVals;
@@ -236,17 +216,16 @@ void Query::processQuery(string query){
 		}
 	}
 
-
+	/*
+	 * Processes each list
+	 */
 	for(int i=0; i<dictWords.size(); ++i){
 		processPrime(auxLists, dictWords, dictVals, i);
 	}
-	
+	/*
+	 * Pushes the documents into the priority queue
+	 */
 	for(unordered_map<unsigned int,BMDocument>::iterator i = Query::bmMap.begin(); i!=Query::bmMap.end(); ++i){
 		Query::dQueue.push(i->second);
 	}
-//	while(!dQueue.empty()){
-//		BMDocument temp = dQueue.top();
-//		cout<<temp.urlId<<" "<<temp.bm<<endl;
-//		Query::dQueue.pop();
-//	}
 }
